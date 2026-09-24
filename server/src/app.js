@@ -9,7 +9,11 @@ const boosterBoxRoutes = require("./routes/boosterBox.routes");
 const uploadRoutes = require("./routes/upload.routes");
 const { notFound, errorHandler } = require("./middlewares/error.middleware");
 const app = express();
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split(",");
+const allowedOrigins = [
+  ...(process.env.CLIENT_URL || "http://localhost:5173").split(","),
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+  "https://gofcard.vercel.app",
+].map((origin) => origin.trim().replace(/\/$/, "")).filter(Boolean);
 const isLocalDevelopmentOrigin = (origin) => /^http:\/\/localhost:\d+$/.test(origin || "");
 
 // 1. Global middleware
