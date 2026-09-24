@@ -19,7 +19,13 @@ export default function AuthModal({ onClose, onAuthenticated }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(`API returned ${response.status} instead of JSON`);
+      }
       if (!response.ok) throw new Error(data.message || "Unable to continue");
       localStorage.setItem("dueldeck_token", data.token);
       localStorage.setItem("dueldeck_user", JSON.stringify(data.user));
