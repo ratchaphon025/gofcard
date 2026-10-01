@@ -15,38 +15,76 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("topup");
   const [error, setError] = useState("");
+  const [historyError, setHistoryError] = useState("");
+  const [configError, setConfigError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    setError("");
+    setHistoryError("");
     try {
       const token = localStorage.getItem("dueldeck_token");
       const headers = { Authorization: `Bearer ${token}` };
-      const [configResponse, accountResponse, ordersResponse] = await Promise.all([
-        fetch(`${API_URL}/topups/config`),
+      const [accountResult, ordersResult] = await Promise.allSettled([
         fetch(`${API_URL}/topups/me`, { headers }),
         fetch(`${API_URL}/orders`, { headers }),
       ]);
-      const configData = await configResponse.json();
-      const accountData = await accountResponse.json();
-      const ordersData = await ordersResponse.json();
-      if (!configResponse.ok || !accountResponse.ok || !ordersResponse.ok) throw new Error(accountData.message || ordersData.message || "โหลดข้อมูลประวัติไม่สำเร็จ");
-      setConfig(configData);
-      setTopUps(accountData.topUps || []);
-      setTransactions(accountData.transactions || []);
-      setOrders(ordersData || []);
-      onWalletUpdated(accountData.walletBalance || 0);
+      const errors = [];
+
+      if (accountResult.status === "fulfilled") {
+        try {
+          const accountResponse = accountResult.value;
+          const accountData = await accountResponse.json();
+          if (accountResponse.ok) {
+            setTopUps(accountData.topUps || []);
+            setTransactions(accountData.transactions || []);
+            onWalletUpdated(accountData.walletBalance || 0);
+          } else {
+            errors.push(accountData.message || "โหลดประวัติเงินเข้าออกไม่สำเร็จ");
+          }
+        } catch {
+          errors.push("โหลดประวัติเงินเข้าออกไม่สำเร็จ");
+        }
+      } else {
+        errors.push("โหลดประวัติเงินเข้าออกไม่สำเร็จ");
+      }
+
+      if (ordersResult.status === "fulfilled") {
+        try {
+          const ordersResponse = ordersResult.value;
+          const ordersData = await ordersResponse.json();
+          if (ordersResponse.ok) setOrders(Array.isArray(ordersData) ? ordersData : []);
+          else errors.push(ordersData.message || "โหลดประวัติคำสั่งซื้อไม่สำเร็จ");
+        } catch {
+          errors.push("โหลดประวัติคำสั่งซื้อไม่สำเร็จ");
+        }
+      } else {
+        errors.push("โหลดประวัติคำสั่งซื้อไม่สำเร็จ");
+      }
+
+      setHistoryError(errors.join(" · "));
     } catch (requestError) {
-      setError(requestError.message === "Failed to fetch" ? "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : requestError.message);
+      setHistoryError(requestError.message === "Failed to fetch" ? "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : requestError.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  const loadConfig = async () => {
+    setConfigError("");
+    try {
+      const response = await fetch(`${API_URL}/topups/config`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "โหลดข้อมูลบัญชีรับเงินไม่สำเร็จ");
+      setConfig(data);
+    } catch (requestError) {
+      setConfigError(requestError.message === "Failed to fetch" ? "โหลดข้อมูลบัญชีรับเงินไม่สำเร็จ" : requestError.message);
+    }
+  };
+
+  useEffect(() => { load(); loadConfig(); }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -92,6 +130,7 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
         <div className="mt-3 rounded-lg bg-slate-950/70 p-3 text-sm text-slate-300">
           {method === "promptpay" ? config.promptPayId ? <p>PromptPay: <strong className="text-white">{config.promptPayId}</strong></p> : <p>ยังไม่ได้ตั้งค่า PromptPay กรุณาติดต่อร้านค้าเพื่อขอข้อมูลชำระเงิน</p> : config.accountNumber ? <><p>ธนาคาร: <strong className="text-white">{config.bankName || "-"}</strong></p><p>ชื่อบัญชี: <strong className="text-white">{config.accountName || "-"}</strong></p><p>เลขบัญชี: <strong className="text-white">{config.accountNumber}</strong></p></> : <p>ยังไม่ได้ตั้งค่าบัญชีธนาคาร กรุณาติดต่อร้านค้าเพื่อขอข้อมูลชำระเงิน</p>}
         </div>
+        {configError && <p role="alert" className="mt-3 rounded-lg bg-rose-500/10 p-3 text-sm text-rose-200">{configError}</p>}
         <h3 className="mt-5 font-bold">2. แจ้งยอดและเลขอ้างอิงการโอน</h3>
         <label className="mt-3 block text-sm text-slate-300">จำนวนเงิน (50–50,000 บาท)<input type="number" min="50" max="50000" step="1" required value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white outline-none focus:border-amber-300" /></label>
         <label className="mt-3 block text-sm text-slate-300">เลขอ้างอิง/เลขที่รายการจากสลิป<input required maxLength="100" value={transactionReference} onChange={(event) => setTransactionReference(event.target.value)} placeholder="เช่น เลขที่รายการ หรือเวลาโอน" className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white outline-none focus:border-amber-300" /></label>
@@ -102,9 +141,10 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
       </form>}
 
       {tab === "history" && <section className="mt-5 space-y-6">
+        {historyError && <p role="alert" className="rounded-lg bg-rose-500/10 p-3 text-sm text-rose-200">{historyError}</p>}
         <div>
           <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">เงินเข้า / เงินออก</h3><button type="button" onClick={load} disabled={loading} className="text-sm text-amber-300 disabled:opacity-50">{loading ? "กำลังโหลด..." : "รีเฟรช"}</button></div>
-          {transactions.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ยังไม่มีรายการเงินเข้าออก</p> : <div className="max-h-60 space-y-2 overflow-auto">{transactions.map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span className="min-w-0"><strong className="block">{item.type === "topup" ? "เงินเข้า · เติมเงิน" : item.type === "admin_credit" ? "เงินเข้า · แอดมินเติมให้" : "เงินออก · ชำระคำสั่งซื้อ"}</strong><span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")} · ยอดคงเหลือ {money.format(item.balanceAfter)}</span><span className="block truncate text-xs text-slate-500">{item.description}</span></span><strong className={item.amount >= 0 ? "shrink-0 text-emerald-300" : "shrink-0 text-rose-300"}>{item.amount >= 0 ? "+" : "−"}{money.format(Math.abs(item.amount))}</strong></div>)}</div>}
+          {transactions.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">{loading ? "กำลังโหลดประวัติ..." : historyError ? "โหลดรายการเงินไม่สำเร็จ ลองกดรีเฟรช" : "ยังไม่มีรายการเงินเข้าออก รายการจะเริ่มแสดงเมื่อเติมเงินได้รับอนุมัติหรือใช้กระเป๋าชำระคำสั่งซื้อ"}</p> : <div className="max-h-60 space-y-2 overflow-auto">{transactions.map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span className="min-w-0"><strong className="block">{item.type === "topup" ? "เงินเข้า · เติมเงิน" : item.type === "admin_credit" ? "เงินเข้า · แอดมินเติมให้" : "เงินออก · ชำระคำสั่งซื้อ"}</strong><span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")} · ยอดคงเหลือ {money.format(item.balanceAfter)}</span><span className="block truncate text-xs text-slate-500">{item.description}</span></span><strong className={item.amount >= 0 ? "shrink-0 text-emerald-300" : "shrink-0 text-rose-300"}>{item.amount >= 0 ? "+" : "−"}{money.format(Math.abs(item.amount))}</strong></div>)}</div>}
         </div>
         <div>
           <h3 className="mb-3 font-bold">คำขอเติมเงิน</h3>
@@ -112,7 +152,7 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
         </div>
         <div>
           <h3 className="mb-3 font-bold">ประวัติซื้อขาย / คำสั่งซื้อ</h3>
-          {orders.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ยังไม่มีประวัติคำสั่งซื้อ</p> : <div className="max-h-72 space-y-2 overflow-auto">{orders.map((order) => <article key={order._id} className="rounded-lg border border-white/10 p-3 text-sm"><div className="flex items-start justify-between gap-3"><span><strong className="block">{order.orderNumber} · {money.format(order.total)}</strong><span className="block text-xs text-slate-500">{new Date(order.createdAt).toLocaleString("th-TH")} · {order.paymentMethod === "wallet" ? "ชำระด้วยกระเป๋าเงิน" : "เก็บเงินปลายทาง"}</span></span><span className="shrink-0 text-amber-300">{orderStatusLabels[order.status] || order.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-400">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(", ")}</p></article>)}</div>}
+          {orders.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">{loading ? "กำลังโหลดประวัติ..." : historyError ? "โหลดคำสั่งซื้อไม่สำเร็จ ลองกดรีเฟรช" : "ยังไม่มีประวัติคำสั่งซื้อ"}</p> : <div className="max-h-72 space-y-2 overflow-auto">{orders.map((order) => <article key={order._id} className="rounded-lg border border-white/10 p-3 text-sm"><div className="flex items-start justify-between gap-3"><span><strong className="block">{order.orderNumber} · {money.format(order.total)}</strong><span className="block text-xs text-slate-500">{new Date(order.createdAt).toLocaleString("th-TH")} · {order.paymentMethod === "wallet" ? "ชำระด้วยกระเป๋าเงิน" : "เก็บเงินปลายทาง"}</span></span><span className="shrink-0 text-amber-300">{orderStatusLabels[order.status] || order.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-400">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(", ")}</p></article>)}</div>}
         </div>
       </section>}
     </section>
