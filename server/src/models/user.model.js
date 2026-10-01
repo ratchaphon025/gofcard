@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     phone: { type: String, trim: true },
     role: { type: String, enum: ["customer", "admin"], default: "customer" },
+    walletBalance: { type: Number, min: 0, default: 0 },
     addresses: { type: [addressSchema], default: [] },
     isActive: { type: Boolean, default: true },
   },

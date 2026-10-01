@@ -7,6 +7,7 @@ const cartRoutes = require("./routes/cart.routes");
 const orderRoutes = require("./routes/order.routes");
 const boosterBoxRoutes = require("./routes/boosterBox.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const topUpRoutes = require("./routes/topUp.routes");
 const { notFound, errorHandler } = require("./middlewares/error.middleware");
 const app = express();
 const allowedOrigins = [
@@ -34,6 +35,7 @@ app.use("/api/cards", cardRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/topups", topUpRoutes);
 app.use("/api/booster-boxes", boosterBoxRoutes);
 app.use("/api/uploads", uploadRoutes);
 

@@ -11,24 +11,28 @@ const emptyCard = {
   condition: "Near Mint",
   imageUrl: "",
 };
+const money = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 });
 
 export default function AdminPanel({ onClose, onSaved }) {
   const token = localStorage.getItem("dueldeck_token");
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
   const [cards, setCards] = useState([]);
   const [users, setUsers] = useState([]);
+  const [topUps, setTopUps] = useState([]);
   const [editing, setEditing] = useState(emptyCard);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const load = async () => {
-    const [cardsResponse, usersResponse] = await Promise.all([
+    const [cardsResponse, usersResponse, topUpsResponse] = await Promise.all([
       fetch(`${API_URL}/cards/admin`, { headers }),
       fetch(`${API_URL}/users`, { headers }),
+      fetch(`${API_URL}/topups/admin`, { headers }),
     ]);
-    if (!cardsResponse.ok || !usersResponse.ok) throw new Error("Could not load admin data");
+    if (!cardsResponse.ok || !usersResponse.ok || !topUpsResponse.ok) throw new Error("Could not load admin data");
     setCards(await cardsResponse.json());
     setUsers(await usersResponse.json());
+    setTopUps(await topUpsResponse.json());
   };
 
   useEffect(() => {
@@ -98,6 +102,18 @@ export default function AdminPanel({ onClose, onSaved }) {
     await load();
   };
 
+  const reviewTopUp = async (topUp, decision) => {
+    setError("");
+    const response = await fetch(`${API_URL}/topups/${topUp._id}/review`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ decision }),
+    });
+    const data = await response.json();
+    if (!response.ok) return setError(data.message || "Could not review top-up");
+    await load();
+  };
+
   const field = (key, label, type = "text") => <label className="text-xs text-slate-300">{label}<input type={type} required={["cardCode", "name"].includes(key)} value={editing[key] ?? ""} onChange={(event) => setEditing({ ...editing, [key]: event.target.value })} className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 outline-none focus:border-amber-300" /></label>;
 
   return <div className="fixed inset-0 z-50 overflow-auto bg-slate-950/95 p-4 sm:p-8">
@@ -106,7 +122,7 @@ export default function AdminPanel({ onClose, onSaved }) {
       {error && <p className="mb-4 rounded-lg bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
         <form onSubmit={saveCard} className="rounded-2xl border border-white/10 bg-[#101729] p-5"><h3 className="mb-4 font-bold">{editing._id ? "Edit card" : "Add card"}</h3><div className="grid gap-3 sm:grid-cols-2">{field("cardCode", "Card code")}{field("name", "Name")}<label className="text-xs text-slate-300">Type<select value={editing.cardType} onChange={(event) => setEditing({ ...editing, cardType: event.target.value })} className="mt-1 w-full rounded-lg border border-white/15 bg-slate-900 px-3 py-2"><option>Monster</option><option>Spell</option><option>Trap</option></select></label><label className="text-xs text-slate-300">Rarity<select value={editing.rarity} onChange={(event) => setEditing({ ...editing, rarity: event.target.value })} className="mt-1 w-full rounded-lg border border-white/15 bg-slate-900 px-3 py-2"><option>Normal</option><option>Rare</option><option>Super Rare</option><option>Ultra Rare</option><option>Secret Rare</option></select></label>{field("price", "Price", "number")}{field("stock", "Stock", "number")}</div><label className="mt-4 block text-xs text-slate-300">Card image<input type="file" accept="image/*" onChange={uploadImage} disabled={uploading} className="mt-1 block w-full text-sm" /></label>{editing.imageUrl && <img src={editing.imageUrl} alt="Card preview" className="mt-3 h-32 w-24 rounded object-cover" />}<div className="mt-4 flex gap-2"><button disabled={uploading} className="rounded-lg bg-amber-300 px-4 py-2 font-bold text-slate-950">Save</button>{editing._id && <button type="button" onClick={() => setEditing(emptyCard)} className="rounded-lg border border-white/15 px-4 py-2">Cancel</button>}</div></form>
-        <section className="rounded-2xl border border-white/10 bg-[#101729] p-5"><h3 className="mb-2 font-bold">Cards ({cards.length})</h3><div className="max-h-80 space-y-2 overflow-auto">{cards.map((card) => <button key={card._id} type="button" onClick={() => setEditing({ ...emptyCard, ...card })} className="flex w-full items-center gap-3 rounded-lg border border-white/10 p-3 text-left hover:border-amber-300/60"><img src={card.imageUrl || "https://placehold.co/48x64/111827/fbbf24?text=?"} alt="" className="h-16 w-12 rounded object-cover" /><span><strong className="block">{card.name}</strong><span className="text-xs text-slate-400">{card.cardCode} · {card.stock} in stock</span></span></button>)}</div><h3 className="mb-2 mt-6 font-bold">Users ({users.length})</h3><div className="space-y-2">{users.map((user) => <div key={user.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span>{user.email}</span><span className="flex gap-2"><select value={user.role} onChange={(event) => updateUser(user, { role: event.target.value })} className="rounded bg-slate-900 px-2 py-1"><option value="customer">customer</option><option value="admin">admin</option></select><button type="button" onClick={() => updateUser(user, { isActive: !user.isActive })} className="rounded border border-white/15 px-2 py-1">{user.isActive ? "Disable" : "Enable"}</button></span></div>)}</div></section>
+        <section className="rounded-2xl border border-white/10 bg-[#101729] p-5"><h3 className="mb-2 font-bold">Cards ({cards.length})</h3><div className="max-h-80 space-y-2 overflow-auto">{cards.map((card) => <button key={card._id} type="button" onClick={() => setEditing({ ...emptyCard, ...card })} className="flex w-full items-center gap-3 rounded-lg border border-white/10 p-3 text-left hover:border-amber-300/60"><img src={card.imageUrl || "https://placehold.co/48x64/111827/fbbf24?text=?"} alt="" className="h-16 w-12 rounded object-cover" /><span><strong className="block">{card.name}</strong><span className="text-xs text-slate-400">{card.cardCode} · {card.stock} in stock</span></span></button>)}</div><h3 className="mb-2 mt-6 font-bold">Users ({users.length})</h3><div className="max-h-64 space-y-2 overflow-auto">{users.map((user) => <div key={user.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span className="min-w-0"><strong className="block truncate">{user.email}</strong><span className="text-xs text-amber-300">Wallet {money.format(user.walletBalance || 0)}</span></span><span className="flex shrink-0 gap-2"><select value={user.role} onChange={(event) => updateUser(user, { role: event.target.value })} className="rounded bg-slate-900 px-2 py-1"><option value="customer">customer</option><option value="admin">admin</option></select><button type="button" onClick={() => updateUser(user, { isActive: !user.isActive })} className="rounded border border-white/15 px-2 py-1">{user.isActive ? "Disable" : "Enable"}</button></span></div>)}</div><h3 className="mb-2 mt-6 font-bold">Top-up requests ({topUps.filter((topUp) => topUp.status === "pending").length} pending)</h3><div className="max-h-96 space-y-2 overflow-auto">{topUps.length === 0 && <p className="text-sm text-slate-500">No top-up requests</p>}{topUps.map((topUp) => <div key={topUp._id} className="rounded-lg border border-white/10 p-3 text-sm"><div className="flex items-start justify-between gap-3"><span><strong className="block">{topUp.user?.name || "Unknown user"} · {money.format(topUp.amount)}</strong><span className="text-xs text-slate-400">{topUp.user?.email} · {topUp.method === "promptpay" ? "PromptPay" : "Bank transfer"}</span><span className="block text-xs text-slate-500">Ref: {topUp.transactionReference} · {new Date(topUp.createdAt).toLocaleString("th-TH")}</span></span><span className={topUp.status === "approved" ? "text-emerald-300" : topUp.status === "rejected" ? "text-rose-300" : "text-amber-300"}>{topUp.status}</span></div>{topUp.status === "pending" && <div className="mt-3 flex gap-2"><button type="button" onClick={() => reviewTopUp(topUp, "approved")} className="rounded bg-emerald-500/15 px-3 py-1.5 font-bold text-emerald-200">Approve</button><button type="button" onClick={() => reviewTopUp(topUp, "rejected")} className="rounded bg-rose-500/15 px-3 py-1.5 font-bold text-rose-200">Reject</button></div>}{topUp.reviewNote && <p className="mt-2 text-xs text-slate-500">{topUp.reviewNote}</p>}</div>)}</div></section>
       </div>
     </div>
   </div>;

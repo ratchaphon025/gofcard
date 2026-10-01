@@ -9,6 +9,8 @@ const userResponse = (user) => ({
   email: user.email,
   phone: user.phone,
   role: user.role,
+  walletBalance: user.walletBalance || 0,
+  isActive: user.isActive,
   addresses: user.addresses,
   createdAt: user.createdAt,
 });

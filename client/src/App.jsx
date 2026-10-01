@@ -3,6 +3,7 @@ import { fallbackCards } from "./data/fallbackCards";
 import AuthModal from "./components/AuthModal";
 import CheckoutModal from "./components/CheckoutModal";
 import AdminPanel from "./components/AdminPanel";
+import TopUpModal from "./components/TopUpModal";
 import { API_URL } from "./config/api";
 
 const rarityStyles = {
@@ -90,12 +91,28 @@ function App() {
   const [notice, setNotice] = useState("กำลังแสดงการ์ดครบ 100 แบบ");
   const [user, setUser] = useState(getStoredUser);
   const [authOpen, setAuthOpen] = useState(false);
+  const [topUpAfterAuth, setTopUpAfterAuth] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const [orderNotice, setOrderNotice] = useState("");
   const [adminOpen, setAdminOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [selectedEffect, setSelectedEffect] = useState("");
   const [heroCardIndex, setHeroCardIndex] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    fetch(`${API_URL}/users/me`, { headers: { Authorization: `Bearer ${localStorage.getItem("dueldeck_token")}` } })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((data) => {
+        if (cancelled) return;
+        setUser(data.user);
+        localStorage.setItem("dueldeck_user", JSON.stringify(data.user));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -171,14 +188,22 @@ function App() {
 
   const count = cart.reduce((total, item) => total + item.quantity, 0);
   const total = cart.reduce((sum, item) => sum + item.card.price * item.quantity, 0);
+  const openTopUp = () => {
+    if (!user) {
+      setTopUpAfterAuth(true);
+      setAuthOpen(true);
+      return;
+    }
+    setTopUpOpen(true);
+  };
 
   return <div className="min-h-screen bg-[#080b16] text-slate-100">
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#080b16]/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
         <a href="#top" className="font-display text-xl font-black tracking-wider text-amber-300">DUEL<span className="text-white">DECK</span></a>
         <nav className="hidden gap-6 text-sm text-slate-300 md:flex"><a href="#shop">ร้านค้า</a><a href="#about">เกี่ยวกับเรา</a></nav>
-        {user ? <div className="hidden items-center gap-2 sm:flex">{user.role === "admin" && <button onClick={() => setAdminOpen(true)} className="rounded-xl border border-amber-300/40 px-3 py-2 text-sm font-bold text-amber-200">จัดการร้าน</button>}<button onClick={() => { localStorage.removeItem("dueldeck_token"); localStorage.removeItem("dueldeck_user"); setUser(null); }} className="rounded-xl border border-white/15 px-3 py-2 text-sm text-slate-200">{user.name} · ออกจากระบบ</button></div> : <button onClick={() => setAuthOpen(true)} className="hidden rounded-xl border border-white/15 px-3 py-2 text-sm font-bold text-slate-100 sm:block">เข้าสู่ระบบ</button>}
-        <button onClick={() => setCartOpen(true)} className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-2 text-sm font-bold text-amber-200">ตะกร้า ({count})</button>
+        {user ? <div className="flex items-center gap-2"><div className="hidden text-right sm:block"><span className="block max-w-32 truncate text-xs text-slate-300">{user.name}</span><span className="block text-xs font-bold text-amber-300">{money.format(user.walletBalance || 0)}</span></div><button onClick={openTopUp} className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-2 py-2 text-xs font-bold text-amber-200 sm:px-3 sm:text-sm">เติมเงิน</button>{user.role === "admin" && <button onClick={() => setAdminOpen(true)} className="rounded-xl border border-white/15 px-2 py-2 text-xs font-bold text-slate-200 sm:px-3 sm:text-sm"><span className="sm:hidden">จัดการ</span><span className="hidden sm:inline">จัดการร้าน</span></button>}<button onClick={() => { localStorage.removeItem("dueldeck_token"); localStorage.removeItem("dueldeck_user"); setUser(null); }} className="rounded-xl border border-white/15 px-2 py-2 text-xs text-slate-200 sm:px-3 sm:text-sm"><span className="sm:hidden">ออก</span><span className="hidden sm:inline">ออกจากระบบ</span></button></div> : <div className="flex items-center gap-2"><button onClick={openTopUp} className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-2 py-2 text-xs font-bold text-amber-200 sm:px-3 sm:text-sm">เติมเงิน</button><button onClick={() => setAuthOpen(true)} className="rounded-xl border border-white/15 px-2 py-2 text-xs font-bold text-slate-100 sm:px-3 sm:text-sm">เข้าสู่ระบบ</button></div>}
+        <button onClick={() => setCartOpen(true)} className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-200 sm:px-4 sm:text-sm">ตะกร้า ({count})</button>
       </div>
     </header>
 
@@ -218,10 +243,11 @@ function App() {
 
     {cartOpen && <aside className="fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-white/10 bg-[#101729] shadow-2xl"><div className="flex items-center justify-between border-b border-white/10 p-5"><h2 className="font-display text-2xl font-black">ตะกร้าของคุณ</h2><button onClick={() => setCartOpen(false)} className="text-2xl text-slate-400">×</button></div><div className="flex-1 overflow-auto p-5">{cart.length === 0 ? <p className="py-12 text-center text-slate-400">ยังไม่มีการ์ดในตะกร้า</p> : cart.map(({ card, quantity }) => <div key={card._id} className="mb-4 flex gap-3 border-b border-white/10 pb-4"><div className={`h-14 w-10 rounded bg-gradient-to-br ${cardColors[card.cardType]}`} /><div className="flex-1"><p className="font-bold">{card.name}</p><p className="text-sm text-amber-300">{money.format(card.price)} × {quantity}</p></div><button onClick={() => setCart((items) => items.filter((item) => item.card._id !== card._id))} className="text-sm text-rose-300">ลบ</button></div>)}</div><div className="border-t border-white/10 p-5"><div className="mb-4 flex justify-between text-lg font-bold"><span>รวมทั้งหมด</span><span className="text-amber-300">{money.format(total)}</span></div><button disabled={!cart.length} onClick={() => { if (!user) { setCartOpen(false); setAuthOpen(true); return; } setCartOpen(false); setCheckoutOpen(true); }} className="w-full rounded-xl bg-amber-300 py-3 font-bold text-slate-950 disabled:opacity-40">ดำเนินการสั่งซื้อ</button></div></aside>}
     {orderNotice && <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-emerald-300/30 bg-emerald-950 px-5 py-3 text-sm text-emerald-100">{orderNotice}</div>}
-    {checkoutOpen && <CheckoutModal cart={cart} onClose={() => setCheckoutOpen(false)} onCompleted={(order) => { setCart([]); setCheckoutOpen(false); setOrderNotice(`สร้างคำสั่งซื้อ ${order.orderNumber} สำเร็จ`); }} />}
+    {checkoutOpen && <CheckoutModal cart={cart} walletBalance={user?.walletBalance || 0} onClose={() => setCheckoutOpen(false)} onCompleted={(order) => { setCart([]); setCheckoutOpen(false); if (order.walletBalance !== undefined) { const updatedUser = { ...user, walletBalance: order.walletBalance }; setUser(updatedUser); localStorage.setItem("dueldeck_user", JSON.stringify(updatedUser)); } setOrderNotice(`สร้างคำสั่งซื้อ ${order.orderNumber} สำเร็จ`); }} />}
     {selectedCard && <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm" onClick={() => setSelectedCard(null)}><div role="dialog" aria-modal="true" aria-label={`รายละเอียด ${selectedCard.name}`} onClick={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/15 bg-[#101729] shadow-2xl"><div className="flex items-center justify-between border-b border-white/10 p-4"><span className="text-sm text-slate-400">รายละเอียดการ์ด</span><button onClick={() => setSelectedCard(null)} className="text-2xl text-slate-400">×</button></div><div className="grid gap-6 p-5 md:grid-cols-[.8fr_1.2fr]"><CardArt card={selectedCard} large /><div><div className="flex items-start justify-between gap-3"><h2 className="font-display text-3xl font-black">{selectedCard.name}</h2><span className={`rounded-md border px-2 py-1 text-xs font-bold ${rarityStyles[selectedCard.rarity]}`}>{selectedCard.rarity}</span></div><p className="mt-2 text-sm text-slate-400">{selectedCard.cardCode} · {selectedCard.cardType}{selectedCard.attribute ? ` · ${selectedCard.attribute}` : ""}</p>{selectedCard.cardType === "Monster" && <div className="mt-5 grid grid-cols-3 gap-2 text-center text-sm"><div className="rounded-lg bg-white/5 p-3"><span className="block text-xs text-slate-400">LEVEL</span>{selectedCard.level || "-"}</div><div className="rounded-lg bg-white/5 p-3"><span className="block text-xs text-slate-400">ATK</span>{selectedCard.atk || 0}</div><div className="rounded-lg bg-white/5 p-3"><span className="block text-xs text-slate-400">DEF</span>{selectedCard.def || 0}</div></div>}            <div className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4"><p className="mb-2 text-xs font-bold tracking-wider text-amber-300">เอฟเฟกต์การ์ด (ภาษาไทย)</p><p className="whitespace-pre-line leading-7 text-slate-200">{selectedEffect || "กำลังแปลเอฟเฟกต์การ์ด..."}</p><p className="mt-3 text-[11px] text-slate-500">แปลจากเอฟเฟกต์จริงของการ์ดใบนี้</p></div><p className="mt-4 leading-7 text-slate-300">{selectedCard.description || "การ์ดสะสมสภาพดี พร้อมจัดส่งจากคลัง DuelDeck"}</p><div className="mt-6 flex items-end justify-between border-t border-white/10 pt-5"><div><p className="text-2xl font-bold text-amber-300">{money.format(selectedCard.price)}</p><p className={selectedCard.stock ? "text-sm text-emerald-300" : "text-sm text-rose-300"}>{selectedCard.stock ? `มีสินค้า ${selectedCard.stock} ใบ` : "สินค้าหมด"}</p></div><button disabled={!selectedCard.stock} onClick={() => { addToCart(selectedCard); setSelectedCard(null); }} className="rounded-xl bg-amber-300 px-5 py-3 font-bold text-slate-950 disabled:opacity-40">เพิ่มลงตะกร้า</button></div></div></div></div></div>}
     {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} onSaved={(savedCard) => { setNotice("บันทึกข้อมูลการ์ดแล้ว"); setCards((currentCards) => currentCards.some((card) => card._id === savedCard._id) ? currentCards.map((card) => card._id === savedCard._id ? savedCard : card) : [savedCard, ...currentCards]); }} />}
-    {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onAuthenticated={(loggedInUser) => { setUser(loggedInUser); setAuthOpen(false); }} />}
+    {authOpen && <AuthModal onClose={() => { setAuthOpen(false); setTopUpAfterAuth(false); }} onAuthenticated={(loggedInUser) => { setUser(loggedInUser); setAuthOpen(false); if (topUpAfterAuth) { setTopUpAfterAuth(false); setTopUpOpen(true); } }} />}
+    {topUpOpen && <TopUpModal walletBalance={user?.walletBalance || 0} onClose={() => setTopUpOpen(false)} onWalletUpdated={(walletBalance) => { setUser((currentUser) => { if (!currentUser) return currentUser; const updatedUser = { ...currentUser, walletBalance }; localStorage.setItem("dueldeck_user", JSON.stringify(updatedUser)); return updatedUser; }); }} />}
   </div>;
 }
 
