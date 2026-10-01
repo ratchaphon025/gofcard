@@ -3,6 +3,7 @@ import { API_URL } from "../config/api";
 
 const money = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 });
 const statusLabels = { pending: "รอตรวจสอบ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ" };
+const orderStatusLabels = { pending_payment: "รอชำระเงิน", paid: "ชำระแล้ว", processing: "กำลังจัดเตรียม", shipped: "จัดส่งแล้ว", completed: "สำเร็จ", cancelled: "ยกเลิก" };
 
 export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated }) {
   const [amount, setAmount] = useState(500);
@@ -11,6 +12,8 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
   const [config, setConfig] = useState({});
   const [topUps, setTopUps] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [tab, setTab] = useState("topup");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,16 +25,19 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
     try {
       const token = localStorage.getItem("dueldeck_token");
       const headers = { Authorization: `Bearer ${token}` };
-      const [configResponse, accountResponse] = await Promise.all([
+      const [configResponse, accountResponse, ordersResponse] = await Promise.all([
         fetch(`${API_URL}/topups/config`),
         fetch(`${API_URL}/topups/me`, { headers }),
+        fetch(`${API_URL}/orders`, { headers }),
       ]);
       const configData = await configResponse.json();
       const accountData = await accountResponse.json();
-      if (!configResponse.ok || !accountResponse.ok) throw new Error(accountData.message || "โหลดข้อมูลกระเป๋าเงินไม่สำเร็จ");
+      const ordersData = await ordersResponse.json();
+      if (!configResponse.ok || !accountResponse.ok || !ordersResponse.ok) throw new Error(accountData.message || ordersData.message || "โหลดข้อมูลประวัติไม่สำเร็จ");
       setConfig(configData);
       setTopUps(accountData.topUps || []);
-      setTransactions((accountData.transactions || []).filter((item) => item.type === "purchase"));
+      setTransactions(accountData.transactions || []);
+      setOrders(ordersData || []);
       onWalletUpdated(accountData.walletBalance || 0);
     } catch (requestError) {
       setError(requestError.message === "Failed to fetch" ? "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : requestError.message);
@@ -72,8 +78,12 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
         <button type="button" onClick={onClose} aria-label="ปิด" className="text-2xl text-slate-400">×</button>
       </div>
       <div className="mt-4 flex items-center justify-between rounded-xl border border-amber-300/20 bg-amber-300/5 p-4"><span className="text-sm text-slate-300">ยอดเงินคงเหลือ</span><strong className="text-xl text-amber-300">{money.format(walletBalance)}</strong></div>
+      <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-950/70 p-1">
+        <button type="button" onClick={() => setTab("topup")} className={`rounded-lg px-3 py-2 text-sm font-bold ${tab === "topup" ? "bg-amber-300 text-slate-950" : "text-slate-300"}`}>เติมเงิน</button>
+        <button type="button" onClick={() => setTab("history")} className={`rounded-lg px-3 py-2 text-sm font-bold ${tab === "history" ? "bg-amber-300 text-slate-950" : "text-slate-300"}`}>ประวัติเงินเข้าออก / ซื้อขาย</button>
+      </div>
 
-      <form onSubmit={submit} className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-4">
+      {tab === "topup" && <form onSubmit={submit} className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-4">
         <h3 className="font-bold">1. โอนเงินเข้าร้าน</h3>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className={`cursor-pointer rounded-lg border p-3 text-sm ${method === "promptpay" ? "border-amber-300/70 bg-amber-300/10" : "border-white/10"}`}><input type="radio" name="topup-method" value="promptpay" checked={method === "promptpay"} onChange={() => setMethod("promptpay")} className="mr-2 accent-amber-300" />PromptPay</label>
@@ -89,12 +99,22 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
         {error && <p className="mt-3 rounded-lg bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
         {notice && <p className="mt-3 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-200">{notice}</p>}
         <button disabled={submitting} className="mt-4 w-full rounded-xl bg-amber-300 py-3 font-bold text-slate-950 disabled:opacity-60">{submitting ? "กำลังส่งคำขอ..." : "ส่งคำขอเติมเงิน"}</button>
-      </form>
+      </form>}
 
-      <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">ประวัติรายการ</h3><button type="button" onClick={load} disabled={loading} className="text-sm text-amber-300 disabled:opacity-50">{loading ? "กำลังโหลด..." : "รีเฟรช"}</button></div>
-        {!topUps.length && !transactions.length ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ยังไม่มีรายการเติมหรือใช้เงิน</p> : <div className="max-h-52 space-y-2 overflow-auto">{topUps.map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span><strong className="block">เติมเงิน · {money.format(item.amount)}</strong><span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")} · {item.transactionReference}</span></span><span className={item.status === "approved" ? "text-emerald-300" : item.status === "rejected" ? "text-rose-300" : "text-amber-300"}>{statusLabels[item.status] || item.status}</span></div>)}{transactions.map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span><strong className="block">{item.type === "topup" ? "เติมเงิน" : "ชำระคำสั่งซื้อ"}</strong><span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")}</span></span><strong className={item.amount >= 0 ? "text-emerald-300" : "text-rose-300"}>{item.amount >= 0 ? "+" : ""}{money.format(item.amount)}</strong></div>)}</div>}
-      </section>
+      {tab === "history" && <section className="mt-5 space-y-6">
+        <div>
+          <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">เงินเข้า / เงินออก</h3><button type="button" onClick={load} disabled={loading} className="text-sm text-amber-300 disabled:opacity-50">{loading ? "กำลังโหลด..." : "รีเฟรช"}</button></div>
+          {transactions.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ยังไม่มีรายการเงินเข้าออก</p> : <div className="max-h-60 space-y-2 overflow-auto">{transactions.map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span className="min-w-0"><strong className="block">{item.type === "topup" ? "เงินเข้า · เติมเงิน" : item.type === "admin_credit" ? "เงินเข้า · แอดมินเติมให้" : "เงินออก · ชำระคำสั่งซื้อ"}</strong><span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")} · ยอดคงเหลือ {money.format(item.balanceAfter)}</span><span className="block truncate text-xs text-slate-500">{item.description}</span></span><strong className={item.amount >= 0 ? "shrink-0 text-emerald-300" : "shrink-0 text-rose-300"}>{item.amount >= 0 ? "+" : "−"}{money.format(Math.abs(item.amount))}</strong></div>)}</div>}
+        </div>
+        <div>
+          <h3 className="mb-3 font-bold">คำขอเติมเงิน</h3>
+          {topUps.filter((item) => item.status !== "approved").length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ไม่มีคำขอที่รอตรวจสอบหรือถูกปฏิเสธ</p> : <div className="max-h-48 space-y-2 overflow-auto">{topUps.filter((item) => item.status !== "approved").map((item) => <div key={item._id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 text-sm"><span><strong className="block">{money.format(item.amount)} · {item.method === "promptpay" ? "PromptPay" : "โอนธนาคาร"}</strong><span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("th-TH")} · {item.transactionReference}</span></span><span className={item.status === "rejected" ? "text-rose-300" : "text-amber-300"}>{statusLabels[item.status] || item.status}</span></div>)}</div>}
+        </div>
+        <div>
+          <h3 className="mb-3 font-bold">ประวัติซื้อขาย / คำสั่งซื้อ</h3>
+          {orders.length === 0 ? <p className="rounded-lg border border-white/10 p-4 text-sm text-slate-500">ยังไม่มีประวัติคำสั่งซื้อ</p> : <div className="max-h-72 space-y-2 overflow-auto">{orders.map((order) => <article key={order._id} className="rounded-lg border border-white/10 p-3 text-sm"><div className="flex items-start justify-between gap-3"><span><strong className="block">{order.orderNumber} · {money.format(order.total)}</strong><span className="block text-xs text-slate-500">{new Date(order.createdAt).toLocaleString("th-TH")} · {order.paymentMethod === "wallet" ? "ชำระด้วยกระเป๋าเงิน" : "เก็บเงินปลายทาง"}</span></span><span className="shrink-0 text-amber-300">{orderStatusLabels[order.status] || order.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-400">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(", ")}</p></article>)}</div>}
+        </div>
+      </section>}
     </section>
   </div>;
 }

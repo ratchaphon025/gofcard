@@ -112,4 +112,13 @@ const getMyOrders = async (req, res, next) => {
   }
 };
 
-module.exports = { createOrder, getMyOrders };
+const getAllOrders = async (req, res, next) => {
+  try {
+    const orders = await Order.find().populate("user", "name email").sort({ createdAt: -1 }).limit(200);
+    res.json(orders);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createOrder, getMyOrders, getAllOrders };

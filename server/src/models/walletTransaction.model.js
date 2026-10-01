@@ -3,9 +3,10 @@ const mongoose = require("mongoose");
 const walletTransactionSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    type: { type: String, enum: ["topup", "purchase"], required: true },
+    type: { type: String, enum: ["topup", "purchase", "admin_credit"], required: true },
     amount: { type: Number, required: true },
     balanceAfter: { type: Number, required: true, min: 0 },
+    performedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     topUp: { type: mongoose.Schema.Types.ObjectId, ref: "TopUp", unique: true, sparse: true },
     order: { type: mongoose.Schema.Types.ObjectId, ref: "Order", unique: true, sparse: true },
     description: { type: String, required: true, trim: true, maxlength: 200 },

@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../models/user.model");
+const WalletTransaction = require("../models/walletTransaction.model");
 
 const createToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 const userResponse = (user) => ({
@@ -100,4 +102,49 @@ const updateUserByAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, getMe, updateMe, listUsers, updateUserByAdmin };
+const creditWalletByAdmin = async (req, res, next) => {
+  const amount = Number(req.body.amount);
+  const note = String(req.body.note || "").trim().slice(0, 200);
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 50000) {
+    return res.status(400).json({ message: "Amount must be a whole number between 1 and 50,000 baht" });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let creditedUser;
+    let transaction;
+    await session.withTransaction(async () => {
+      creditedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        { $inc: { walletBalance: amount } },
+        { new: true, session }
+      );
+      if (!creditedUser) {
+        const error = new Error("User not found");
+        error.status = 404;
+        throw error;
+      }
+
+      [transaction] = await WalletTransaction.create([{
+        user: creditedUser._id,
+        type: "admin_credit",
+        amount,
+        balanceAfter: creditedUser.walletBalance,
+        performedBy: req.user._id,
+        description: note || `Admin credit by ${req.user.email}`,
+      }], { session });
+    });
+
+    res.status(201).json({
+      user: { id: creditedUser._id, name: creditedUser.name, email: creditedUser.email, walletBalance: creditedUser.walletBalance },
+      transaction,
+    });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
+    next(error);
+  } finally {
+    await session.endSession();
+  }
+};
+
+module.exports = { register, login, getMe, updateMe, listUsers, updateUserByAdmin, creditWalletByAdmin };
