@@ -5,7 +5,7 @@ const money = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB
 const statusLabels = { pending: "รอตรวจสอบ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ" };
 const orderStatusLabels = { pending_payment: "รอชำระเงิน", paid: "ชำระแล้ว", processing: "กำลังจัดเตรียม", shipped: "จัดส่งแล้ว", completed: "สำเร็จ", cancelled: "ยกเลิก" };
 
-export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated }) {
+export default function TopUpModal({ initialTab = "topup", walletBalance = 0, onClose, onWalletUpdated }) {
   const [amount, setAmount] = useState(500);
   const [method, setMethod] = useState("promptpay");
   const [transactionReference, setTransactionReference] = useState("");
@@ -13,7 +13,7 @@ export default function TopUpModal({ walletBalance = 0, onClose, onWalletUpdated
   const [topUps, setTopUps] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [tab, setTab] = useState("topup");
+  const [tab, setTab] = useState(initialTab);
   const [error, setError] = useState("");
   const [historyError, setHistoryError] = useState("");
   const [configError, setConfigError] = useState("");
