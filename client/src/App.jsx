@@ -106,11 +106,21 @@ function App() {
     if (!user?.id) return undefined;
     let cancelled = false;
     fetch(`${API_URL}/users/me`, { headers: { Authorization: `Bearer ${localStorage.getItem("dueldeck_token")}` } })
-      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((response) => {
+        if (response.status === 401) {
+          localStorage.removeItem("dueldeck_token");
+          localStorage.removeItem("dueldeck_user");
+          setUser(null);
+          setAdminOpen(false);
+          return null;
+        }
+        return response.ok ? response.json() : Promise.reject();
+      })
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || !data) return;
         setUser(data.user);
         localStorage.setItem("dueldeck_user", JSON.stringify(data.user));
+        if (data.user.role !== "admin") setAdminOpen(false);
       })
       .catch(() => {});
     return () => { cancelled = true; };

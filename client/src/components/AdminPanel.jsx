@@ -31,14 +31,31 @@ export default function AdminPanel({ onClose, onSaved }) {
   const [crediting, setCrediting] = useState(false);
 
   const load = async () => {
-    const [cardsResponse, usersResponse, topUpsResponse, ordersResponse, feedbackResponse] = await Promise.all([
-      fetch(`${API_URL}/cards/admin`, { headers }),
-      fetch(`${API_URL}/users`, { headers }),
-      fetch(`${API_URL}/topups/admin`, { headers }),
-      fetch(`${API_URL}/orders/admin`, { headers }),
-      fetch(`${API_URL}/feedback/admin`, { headers }),
-    ]);
-    if (!cardsResponse.ok || !usersResponse.ok || !topUpsResponse.ok || !ordersResponse.ok || !feedbackResponse.ok) throw new Error("Could not load admin data");
+    const adminRequests = [
+      ["การ์ด", `${API_URL}/cards/admin`],
+      ["ผู้ใช้", `${API_URL}/users`],
+      ["รายการเติมเงิน", `${API_URL}/topups/admin`],
+      ["คำสั่งซื้อ", `${API_URL}/orders/admin`],
+      ["ความคิดเห็น", `${API_URL}/feedback/admin`],
+    ];
+    const responses = await Promise.all(adminRequests.map(async ([label, url]) => {
+      try {
+        return await fetch(url, { headers });
+      } catch (requestError) {
+        throw new Error(`เชื่อมต่อ API ส่วน${label}ไม่ได้: ${requestError.message}`);
+      }
+    }));
+    const failedIndex = responses.findIndex((response) => !response.ok);
+    if (failedIndex !== -1) {
+      const response = responses[failedIndex];
+      const [label] = adminRequests[failedIndex];
+      const data = await response.json().catch(() => ({}));
+      const detail = data.message ? ` — ${data.message}` : "";
+      if (response.status === 401) throw new Error(`เซสชันหมดอายุหรือ token ใช้ไม่ได้ กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่ (${label}: 401${detail})`);
+      if (response.status === 403) throw new Error(`บัญชีนี้ไม่มีสิทธิ์ผู้ดูแล (${label}: 403${detail})`);
+      throw new Error(`โหลดข้อมูล${label}ไม่สำเร็จ (HTTP ${response.status}${detail})`);
+    }
+    const [cardsResponse, usersResponse, topUpsResponse, ordersResponse, feedbackResponse] = responses;
     setCards(await cardsResponse.json());
     setUsers(await usersResponse.json());
     setTopUps(await topUpsResponse.json());
