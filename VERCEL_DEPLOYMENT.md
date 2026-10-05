@@ -31,6 +31,20 @@ npm --prefix server run seed:admin
 
 The seeder creates the account or promotes the matching email to admin, activates it, and resets its password to `ADMIN_PASSWORD`. After it completes, sign out of the website and sign in using that email and password. Setting these variables in Vercel alone does not run the seeder.
 
+## Import Booster Boxes and special cards
+
+The Box-pull-only Fusion, Xyz, Synchro, and Pendulum cards are imported into MongoDB by one-off seed commands. Do not add these commands to Vercel's Build Command: they modify the production database and should only be run intentionally.
+
+Install and authenticate the Vercel CLI, link the local repository to the Vercel project if it is not linked yet, then run these commands from the repository root in PowerShell:
+
+```powershell
+vercel env pull server/.env --environment=production
+npm --prefix server run seed:booster-boxes
+npm --prefix server run seed:special-cards
+```
+
+`server/.env` is gitignored. The Box seeder adds the related Booster Box entries without overwriting existing prices or stock. The special-card seeder imports 50 cards per summon type, uses card images and card text from the card data source, and converts USD market prices to THB. Review the starter Box prices in `server/src/data/boosterBoxes.seed.js` and update them in the store admin before offering those products for sale.
+
 The admin card image picker sends the file to `/api/uploads`. The API stores the file in Vercel Blob and saves the returned public URL in MongoDB when the card is saved. Files are held in memory only; nothing is written to the Vercel filesystem.
 
 For local development, copy `server/.env.example` to `server/.env`, use a local or Atlas `MONGO_URI`, and run `npm --prefix server run dev` plus `npm --prefix client run dev`.

@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "seed:cards": "node src/seedCards.js",
     "seed:premium": "node src/seedPremiumCards.js",
+    "seed:special-cards": "node src/seedSpecialCards.js",
     "seed:iconic": "node src/seedIconicCards.js",
     "seed:booster-boxes": "node src/seedBoosterBoxes.js",
     "seed:admin": "node src/seedAdmin.js"

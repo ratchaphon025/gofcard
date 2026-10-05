@@ -10,6 +10,11 @@ const cardSchema = new mongoose.Schema(
       required: true,
       enum: ["Monster", "Spell", "Trap"],
     },
+    monsterType: {
+      type: String,
+      enum: ["Fusion", "Xyz", "Synchro", "Pendulum", null],
+      default: null,
+    },
     rarity: {
       type: String,
       required: true,
@@ -26,6 +31,9 @@ const cardSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     effectTH: { type: String, default: "", trim: true, maxlength: 1000 },
     imageUrl: { type: String, default: "" },
+    priceSource: { type: String, enum: ["set", "card_market"], default: "set" },
+    isBoxPullOnly: { type: Boolean, default: false },
+    boosterBoxCodes: { type: [String], default: [] },
     price: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     condition: {

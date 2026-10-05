@@ -16,7 +16,19 @@ const getBoxImage = async (boxCode) => {
 const run = async () => {
   await connectDB();
   const boxesWithImages = await Promise.all(boxes.map(async (box) => ({ ...box, imageUrl: await getBoxImage(box.boxCode) })));
-  await BoosterBox.bulkWrite(boxesWithImages.map((box) => ({ updateOne: { filter: { boxCode: box.boxCode }, update: { $set: box }, upsert: true } })));
+  await BoosterBox.bulkWrite(boxesWithImages.map((box) => {
+    const { price, stock, isActive, imageUrl, ...metadata } = box;
+    return {
+      updateOne: {
+        filter: { boxCode: box.boxCode },
+        update: {
+          $set: { ...metadata, ...(imageUrl ? { imageUrl } : {}) },
+          $setOnInsert: { price, stock, isActive },
+        },
+        upsert: true,
+      },
+    };
+  }));
   console.log(`Seeded ${boxes.length} Yu-Gi-Oh! booster boxes.`);
   process.exit(0);
 };

@@ -1,7 +1,8 @@
 const Card = require("../models/card.model");
 const editableFields = [
-  "cardCode", "name", "nameTH", "cardType", "rarity", "attribute", "level",
-  "atk", "def", "description", "effectTH", "imageUrl", "price", "stock", "condition", "isFeatured", "isActive",
+  "cardCode", "name", "nameTH", "cardType", "monsterType", "rarity", "attribute", "level",
+  "atk", "def", "description", "effectTH", "imageUrl", "priceSource", "isBoxPullOnly", "boosterBoxCodes",
+  "price", "stock", "condition", "isFeatured", "isActive",
 ];
 
 const pickCardFields = (body) => editableFields.reduce((result, field) => {
@@ -11,10 +12,11 @@ const pickCardFields = (body) => editableFields.reduce((result, field) => {
 
 const getCards = async (req, res, next) => {
   try {
-    const { rarity, cardType, search } = req.query;
+    const { rarity, cardType, monsterType, search } = req.query;
     const filter = { isActive: true };
     if (rarity) filter.rarity = rarity;
     if (cardType) filter.cardType = cardType;
+    if (monsterType) filter.monsterType = monsterType;
     if (search) filter.$or = [
       { name: { $regex: search, $options: "i" } },
       { cardCode: { $regex: search, $options: "i" } },
@@ -29,10 +31,11 @@ const getCards = async (req, res, next) => {
 
 const getAdminCards = async (req, res, next) => {
   try {
-    const { rarity, cardType, search } = req.query;
+    const { rarity, cardType, monsterType, search } = req.query;
     const filter = {};
     if (rarity) filter.rarity = rarity;
     if (cardType) filter.cardType = cardType;
+    if (monsterType) filter.monsterType = monsterType;
     if (search) filter.$or = [
       { name: { $regex: search, $options: "i" } },
       { cardCode: { $regex: search, $options: "i" } },

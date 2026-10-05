@@ -34,7 +34,12 @@ const createOrder = async (req, res, next) => {
       const isBox = Boolean(requested.boosterBox);
       const Product = isBox ? BoosterBox : Card;
       const product = await Product.findOneAndUpdate(
-        { _id: isBox ? requested.boosterBox : requested.card, isActive: true, stock: { $gte: requested.quantity } },
+        {
+          _id: isBox ? requested.boosterBox : requested.card,
+          isActive: true,
+          stock: { $gte: requested.quantity },
+          ...(isBox ? {} : { isBoxPullOnly: { $ne: true } }),
+        },
         { $inc: { stock: -requested.quantity } },
         { new: true }
       );

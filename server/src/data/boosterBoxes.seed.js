@@ -19,8 +19,17 @@ module.exports = [
   ["DREV-BOX", "Duelist Revolution", 2010, 24, 18900],
   ["RA01-BOX", "25th Anniversary Rarity Collection", 2023, 24, 5900],
   ["AGOV-BOX", "Age of Overlord", 2023, 24, 3300],
-].map(([boxCode, name, releaseYear, packsPerBox, price]) => ({
+  ["LCGX-BOX", "Legendary Collection 2: The Duel Academy Years Mega Pack", 2011, 5, 1500, true],
+  ["BLMM-BOX", "Battles of Legend: Monster Mayhem", 2025, 24, 2500, true],
+  ["RA04-BOX", "Quarter Century Stampede", 2025, 24, 3500, true],
+  ["NUMH-BOX", "Number Hunters", 2013, 24, 4500, true],
+  ["LC5D-BOX", "Legendary Collection 5D's Mega Pack", 2014, 5, 2000, true],
+  ["PEVO-BOX", "Pendulum Evolution", 2017, 24, 5000, true],
+  ["BOSH-BOX", "Breakers of Shadow", 2016, 24, 6500, true],
+].map(([boxCode, name, releaseYear, packsPerBox, price, estimatedBoxPrice]) => ({
   boxCode, name, releaseYear, packsPerBox, price, stock: 2,
-  description: `Factory-sealed Yu-Gi-Oh! booster box containing ${packsPerBox} booster packs.`,
+  description: estimatedBoxPrice
+    ? `Factory-sealed Yu-Gi-Oh! booster product containing ${packsPerBox} packs. Review the starter price estimate before listing.`
+    : `Factory-sealed Yu-Gi-Oh! booster box containing ${packsPerBox} booster packs.`,
   isActive: true,
 }));

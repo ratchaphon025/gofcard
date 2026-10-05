@@ -22,3 +22,21 @@ test("accepts a valid card listing", async () => {
   });
   await card.validate();
 });
+
+test("supports box-pull-only extra deck cards", async () => {
+  const card = new Card({
+    cardCode: "BOX-SYN-001",
+    name: "Box Pull Synchro",
+    cardType: "Monster",
+    monsterType: "Synchro",
+    rarity: "Secret Rare",
+    price: 120,
+    stock: 0,
+    isBoxPullOnly: true,
+    boosterBoxCodes: ["DREV-BOX"],
+  });
+
+  await card.validate();
+  assert.equal(card.isBoxPullOnly, true);
+  assert.deepEqual(card.boosterBoxCodes, ["DREV-BOX"]);
+});
