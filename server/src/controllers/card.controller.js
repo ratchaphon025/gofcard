@@ -1,4 +1,5 @@
 const Card = require("../models/card.model");
+const { translateEnglishToThai } = require("../utils/translation.utils");
 const editableFields = [
   "cardCode", "name", "nameTH", "cardType", "monsterType", "rarity", "attribute", "level",
   "atk", "def", "description", "effectTH", "imageUrl", "priceSource", "isBoxPullOnly", "boosterBoxCodes",
@@ -58,6 +59,21 @@ const getCardById = async (req, res, next) => {
   }
 };
 
+const translateEffect = async (req, res) => {
+  const { text } = req.body;
+  if (typeof text !== "string" || !text.trim() || text.length > 5000) {
+    return res.status(400).json({ message: "Effect text must be between 1 and 5000 characters" });
+  }
+
+  try {
+    const translation = await translateEnglishToThai(text.trim());
+    return res.json({ translation });
+  } catch (error) {
+    console.error("Effect translation failed:", error.message);
+    return res.status(502).json({ message: "บริการแปลเอฟเฟกต์ขัดข้อง กรุณาลองใหม่อีกครั้ง" });
+  }
+};
+
 const createCard = async (req, res, next) => {
   try {
     const card = await Card.create(pickCardFields(req.body));
@@ -80,4 +96,4 @@ const updateCard = async (req, res, next) => {
   }
 };
 
-module.exports = { getCards, getAdminCards, getCardById, createCard, updateCard };
+module.exports = { getCards, getAdminCards, getCardById, translateEffect, createCard, updateCard };

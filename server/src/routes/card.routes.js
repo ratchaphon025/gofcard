@@ -3,6 +3,7 @@ const {
   getCards,
   getAdminCards,
   getCardById,
+  translateEffect,
   createCard,
   updateCard,
 } = require("../controllers/card.controller");
@@ -12,6 +13,7 @@ const router = express.Router();
 
 router.route("/").get(getCards).post(protect, requireRole("admin"), createCard);
 router.get("/admin", protect, requireRole("admin"), getAdminCards);
+router.post("/translate-effect", translateEffect);
 router.route("/:id").get(getCardById).patch(protect, requireRole("admin"), updateCard);
 
 module.exports = router;

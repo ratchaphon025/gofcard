@@ -142,28 +142,35 @@ function App() {
     setSelectedEffect("");
     if (!selectedCard) return undefined;
 
-    fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(selectedCard.name)}`)
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("ไม่พบข้อมูลเอฟเฟกต์")))
-      .then(async (data) => {
-        const effect = data.data?.[0]?.desc || "";
+    const loadEffect = async () => {
+      try {
+        let effect = selectedCard.description || "";
+        if (!effect || /^Yu-Gi-Oh! card #\d+$/i.test(effect)) {
+          const cardResponse = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(selectedCard.name)}`);
+          if (!cardResponse.ok) throw new Error("ไม่พบข้อมูลเอฟเฟกต์");
+          const cardData = await cardResponse.json();
+          effect = cardData.data?.[0]?.desc || "";
+        }
         if (!effect) {
           if (!cancelled) setSelectedEffect(selectedCard.effectTH || "การ์ดใบนี้ไม่มีเอฟเฟกต์พิเศษ");
           return;
         }
 
-        const translationResponse = await fetch(
-          `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=th&dt=t&q=${encodeURIComponent(effect)}`
-        );
-        if (!translationResponse.ok) throw new Error("แปลเอฟเฟกต์ไม่สำเร็จ");
-        const translation = await translationResponse.json();
-        const translatedEffect = Array.isArray(translation?.[0])
-          ? translation[0].map((part) => part?.[0] || "").join("")
-          : "";
-        if (!cancelled) setSelectedEffect(translatedEffect || selectedCard.effectTH || effect);
-      })
-      .catch(() => {
-        if (!cancelled) setSelectedEffect(selectedCard.effectTH || "ไม่สามารถโหลดคำแปลเอฟเฟกต์ได้ในขณะนี้");
-      });
+        const response = await fetch(`${API_URL}/cards/translate-effect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: effect }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "แปลเอฟเฟกต์ไม่สำเร็จ");
+        if (!result.translation) throw new Error("บริการแปลไม่ได้ส่งคำแปลกลับมา");
+        if (!cancelled) setSelectedEffect(result.translation);
+      } catch (error) {
+        if (!cancelled) setSelectedEffect(error.message || "ไม่สามารถแปลเอฟเฟกต์ได้ในขณะนี้");
+      }
+    };
+
+    loadEffect();
 
     return () => { cancelled = true; };
   }, [selectedCard]);
