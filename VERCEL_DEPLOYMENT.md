@@ -33,17 +33,9 @@ The seeder creates the account or promotes the matching email to admin, activate
 
 ## Import Booster Boxes and special cards
 
-The Box-pull-only Fusion, Xyz, Synchro, and Pendulum cards are imported into MongoDB by one-off seed commands. Do not add these commands to Vercel's Build Command: they modify the production database and should only be run intentionally.
+Production deployments automatically seed the related Booster Boxes and Box-pull-only Fusion, Xyz, Synchro, and Pendulum cards after the client build. Preview deployments do not modify the database. Ensure `MONGO_URI` is configured for the Production environment and that MongoDB Atlas permits connections from Vercel; a seed failure will fail the deployment rather than silently leave the catalogue incomplete.
 
-Install and authenticate the Vercel CLI, link the local repository to the Vercel project if it is not linked yet, then run these commands from the repository root in PowerShell:
-
-```powershell
-vercel env pull server/.env --environment=production
-npm --prefix server run seed:booster-boxes
-npm --prefix server run seed:special-cards
-```
-
-`server/.env` is gitignored. The Box seeder adds the related Booster Box entries without overwriting existing prices or stock. The special-card seeder imports 50 cards per summon type, uses card images and card text from the card data source, and converts USD market prices to THB. Review the starter Box prices in `server/src/data/boosterBoxes.seed.js` and update them in the store admin before offering those products for sale.
+The Box seeder adds related products without overwriting existing prices or stock. The special-card seeder imports 50 cards per summon type, using card images and card text from the card data source and converting USD market prices to THB. Review the starter Box prices in `server/src/data/boosterBoxes.seed.js` and update them in the store admin before offering those products for sale.
 
 The admin card image picker sends the file to `/api/uploads`. The API stores the file in Vercel Blob and saves the returned public URL in MongoDB when the card is saved. Files are held in memory only; nothing is written to the Vercel filesystem.
 

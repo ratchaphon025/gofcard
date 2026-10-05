@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix client run build",
+  "buildCommand": "npm --prefix client run build && if [ \"$VERCEL_ENV\" = \"production\" ]; then npm --prefix server run seed:booster-boxes && npm --prefix server run seed:special-cards; fi",
   "outputDirectory": "client/dist",
   "installCommand": "npm --prefix server install && npm --prefix client install",
   "rewrites": [
